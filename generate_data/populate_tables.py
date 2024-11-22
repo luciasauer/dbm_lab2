@@ -82,11 +82,26 @@ def populate_bookings(n=20):
     session.commit()
 
 def populate_booking_details(n=20):
-    booking_ids = {booking.id for booking in session.query(Booking).all()}
-    for booking_id in booking_ids:
+    # Fetch bookings along with their corresponding flight and aircraft_id
+    bookings_with_aircraft_info = (
+        session.query(
+            Booking.id.label("booking_id"),
+            Flight.id.label("flight_id"),
+            AircraftSlot.aircraft_id.label("aircraft_id")
+        )
+        .join(Flight, Booking.flight_id == Flight.id)  # Join Booking with Flight
+        .join(AircraftSlot, Flight.slot_id == AircraftSlot.id)  # Join Flight with AircraftSlot
+        .all()
+    )
+    
+    for booking in bookings_with_aircraft_info:
+        booking_id = booking.booking_id
+        aircraft_id = booking.aircraft_id  
+
+        # Create a new BookingDetails record with consistent aircraft_id
         booking_detail = BookingDetails(
             booking_id=booking_id,
-            aircraft_id=random.randint(1, 5),
+            aircraft_id=aircraft_id,
             seat_row=str(random.randint(1, 10)),
             seat_letter=random.choice(['A', 'B', 'C', 'D', 'E', 'F']),
             price=round(random.uniform(50, 2500), 2),
@@ -96,6 +111,7 @@ def populate_booking_details(n=20):
             last_updated=datetime.now()
         )
         session.add(booking_detail)
+    
     session.commit()
 
 def populate_flight_status(n=10):
