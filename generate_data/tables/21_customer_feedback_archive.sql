@@ -1,6 +1,6 @@
-DROP TABLE IF EXISTS customer_feedback CASCADE;
+DROP TABLE IF EXISTS customer_feedback_archive CASCADE;
 
-CREATE TABLE customer_feedback (
+CREATE TABLE customer_feedback_archive (
     id SERIAL PRIMARY KEY,
     customer_id INT NOT NULL,
     flight_id INT NOT NULL,

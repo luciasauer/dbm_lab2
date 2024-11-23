@@ -176,5 +176,6 @@ class CustomerFeedback(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     customer_id = Column(Integer, ForeignKey('customer.id', ondelete='CASCADE'), nullable=False)
     flight_id = Column(Integer, ForeignKey('flight.id', ondelete='CASCADE'), nullable=False)
+    feedback_timestamp = Column(DateTime, nullable=False)
     feedback = Column(JSONB, nullable=False)
 

@@ -1,0 +1,3 @@
+-- Insert recent feedback: this should activate the trigger T2, and move feedback to the archive if there is feedback from 2 years ago or older
+INSERT INTO customer_feedback (customer_id, flight_id, feedback, feedback_timestamp)
+VALUES (101, 5, '{"rating": 1, "topics": {"comfort": 4, "service": 4, "cleanliness": 1, "entertainment": 2}, "comments": "Plane crashed.", "survey_date": "2024-04-18"}', CURRENT_DATE);
