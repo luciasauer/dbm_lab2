@@ -2,9 +2,9 @@
 
 -- Step 1: Select the departure and destination airports and count the number of bookings for each route.
 SELECT 
-    f.origin,                               -- Departure airport
-    f.destination,                          -- Destination airport
-    COUNT(b.id) AS number_booking           -- Total number of bookings for the route
+    f.origin,                               
+    f.destination,                          
+    COUNT(b.id) AS number_booking -- Total number of bookings for the route
 FROM 
     flight f
 JOIN 
