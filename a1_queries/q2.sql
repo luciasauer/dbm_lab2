@@ -10,7 +10,7 @@ WITH flights_dc AS (
 		fs2.status
 	FROM flight f 
 	INNER JOIN flight_status fs2 ON f.id = fs2.id -- We JOIN the flight status table on flight, through the flight id 
-	WHERE fs2.status = 'CANCELED' OR fs2.status = 'DELAYED'
+	WHERE fs2.status = 'CANCELED' OR fs2.status = 'DELAYED' --Once a flight is canceled or delayed, it cannot be scheduled again. This marks the final update in the status table for the corresponding flight ID
 ),
 	
 -- Step 2: we create a CTE with flight crew details for each flight

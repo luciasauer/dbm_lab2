@@ -1,73 +1,91 @@
---Find flights departing in the next 7 days that are operated by a specific aircraft model but are not yet fully booked.
+-- Q4) Find flights departing in the next 7 days that are operated by a specific aircraft model but are not yet fully booked.
 
---Retrieve the flight for the next 7 days
-with next_flight as (
-select
-f.id as flight_id,
-aslots.aircraft_id as aircraft_id
---aslots.id as slot_id,
---aslots.start_datetime as departure_time,
-from
-flight f
-join aircraft_slot aslots on aslots.id = f.slot_id
-join flight_status fs on fs.flight_id = f.id
-where aslots.type = 'FLIGHT' 
-and aslots.start_datetime>CURRENT_TIMESTAMP 
-and aslots.start_datetime>CURRENT_TIMESTAMP + INTERVAL '7 days'
-and fs.last_updated = (select MAX(last_updated) from flight_status fs2 where fs2.flight_id = fs.flight_id)
-and fs.status <> 'CANCELLED'
+-- Step 1.1: we join the aircraft slot table with the aircraft model
+WITH slot_model AS (
+	SELECT
+		sl.id AS slot_id,
+		sl.aircraft_id AS aircraft_id,
+		sl.start_datetime AS start_datetime,
+		a.aircraft_type AS aircraft_type
+	FROM aircraft_slot sl
+	INNER JOIN aircraft a ON sl.aircraft_id = a.id
+),
+
+-- Step 1.2: we join the previous subquery with the flight table, on the flight_id, and filter the flights that will depart in the next 7 days
+flights_date AS (
+	SELECT
+		f.id AS flight_id,
+		f.origin AS origin,
+		f.destination AS destination,
+		f.operating_airline AS operating_airline,
+		slot_model.aircraft_id AS aircraft_id,
+		slot_model.start_datetime AS start_datetime,
+		slot_model.aircraft_type AS aircraft_type
+	FROM flight f
+	INNER JOIN slot_model ON f.slot_id = slot_model.slot_id
+	-- We filter for the flights which depart in the next 7 days (in real time; we may not get any result if there are no future flights in the next 7 days)
+	WHERE slot_model.start_datetime >= NOW() 
+	  AND slot_model.start_datetime < NOW() + INTERVAL '7 days'
+),
+
+-- Step 2.1: we make a subquery of the count of total seats per aircraft_id
+total_seats_aircraft AS (
+	SELECT 
+	    aircraft_id, 
+	    COUNT(*) AS total_seats
+	FROM 
+    	aircraft_seats
+	GROUP BY aircraft_id
+),
+
+-- Step 2.2: we count the number of bookings for each flight, where each booking corresponds to one ticket/seat
+
+booked_seats_flight AS (
+	SELECT
+		bd.aircraft_id AS aircraft_id,
+		b.flight_id AS flight_id,
+		COUNT(*) AS num_seats_booked
+	FROM booking_details bd
+	INNER JOIN booking b ON bd.booking_id = b.id
+	WHERE
+		-- We only consider those bookings which are confirmed and with the payment accepted
+		bd.booking_status = 'CONFIRMED'
+		AND bd.payment_status = 'ACCEPTED'
+		-- We only consider the last update of the bookings
+		AND bd.last_updated = (SELECT MAX(last_updated) FROM booking_details bd2 WHERE bd2.booking_id = bd.booking_id)
+	GROUP BY 
+		bd.aircraft_id,
+		b.flight_id
+),
+
+-- Step 2.3: we get the flights which are not fully booked (i.e., number of booked seats equals thet number of available seats)
+
+not_fully_booked AS (
+	SELECT
+		bs.flight_id AS flight_id,
+		bs.aircraft_id AS aircraft_id,
+		ts.total_seats AS total_seats,
+		bs.num_seats_booked AS num_seats_booked,
+		ts.total_seats - bs.num_seats_booked AS remaining_seats
+	FROM booked_seats_flight bs
+	INNER JOIN total_seats_aircraft ts ON bs.aircraft_id = ts.aircraft_id
+	WHERE bs.num_seats_booked < ts.total_seats
 )
-, 
 
---Calculates the number of confirmed passengers for each flight
-passagners as (
-select 
-f.id as flight_id,
-aslots.aircraft_id,
-count(distinct b.id) as number_passangers
-from booking b
-join flight f on f.id = b.flight_id
-join flight_status fs on fs.flight_id = f.id
-join booking_details bd on bd.booking_id = b.id
-join aircraft_slot aslots on aslots.id = f.slot_id
-where bd.last_updated = (select MAX(last_updated) from booking_details bd2 where bd2.booking_id = bd.booking_id)
-and bd.payment_status = 'ACCEPTED' and bd.booking_status = 'CONFIRMED'
-and fs.last_updated = (select MAX(last_updated) from flight_status fs2 where fs2.flight_id = fs.flight_id)
-and aslots.type = 'FLIGHT'
-group by 1,2)
+-- Step 3: we join the results from step 1.2 and step 2.3 to get the flights departing in the next 7 days that are not fully booked yet
 
---number of seats by aircraft
+SELECT 
+	fd.flight_id AS flight_id,
+	fd.aircraft_id AS aircraft_id,
+	fd.aircraft_type AS aircraft_type,
+	fd.operating_airline AS operating_airline,
+	fd.origin AS origin,
+	fd.destination AS destination,
+	fd.start_datetime AS start_datetime,
+	nfb.total_seats AS total_seats,
+	nfb.num_seats_booked AS num_seats_booked,
+	nfb.remaining_seats AS remaining_seats
+FROM flights_date fd
+INNER JOIN not_fully_booked nfb ON fd.flight_id = nfb.flight_id AND fd.aircraft_id = nfb.aircraft_id
 
-, capacity as (
-select a.id as aircraft_id,
-COUNT(DISTINCT CONCAT(as2.seat_row, '-', as2.seat_letter, '-', as2.seat_type)) AS capacity_number
-from 
-aircraft a
-join aircraft_seats as2 on a.id= as2.aircraft_id
-group by 1)
-
---Join the tables to get the the flights in the next 7 days that are not fully booked operated by a specific aircraft
-
-select 
-nf.flight_id,
-nf.aircraft_id,
-p.number_passangers,
-c.capacity_number,
-c.capacity_number- p.number_passangers number_available_seats
-from next_flight nf
-join passagners p on nf.flight_id = p.flight_id and nf.aircraft_id = p.aircraft_id
-join capacity c on c.aircraft_id = p.aircraft_id
-where nf.flight_id is not null --this guarantee that we are only retrieving for the flight on the next 7 days
-and c.capacity_number- p.number_passangers>0 --not fully booked
-
-
-
-
-
-
-
-
-
-
-
-
+-- (if there are no flights as a result, the reason is that there are no future flights scheduled)
