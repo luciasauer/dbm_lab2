@@ -301,6 +301,7 @@ def populate_customer_feedback(n=1000):
         feedback = CustomerFeedback(
             customer_id=random.choice(list(customer_ids)),
             flight_id=random.choice(list(flight_ids)),
+            feedback_timestamp = faker.date_time_this_year(),
             feedback={
             "survey_date": faker.date_this_year().isoformat(),
             "rating": random.randint(1, 5),

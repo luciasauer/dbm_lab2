@@ -5,6 +5,7 @@ CREATE TABLE customer_feedback_archive (
     customer_id INT NOT NULL,
     flight_id INT NOT NULL,
     feedback JSONB,
+    feedback_timestamp TIMESTAMP NOT NULL,
     FOREIGN KEY (customer_id) REFERENCES customer(id) ON DELETE CASCADE,
     FOREIGN KEY (flight_id) REFERENCES flight(id) ON DELETE CASCADE
 );
